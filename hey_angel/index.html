@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Latido Personalizado!</title>
+    <!-- Google Fonts: Poppins, Quicksand y Roboto Mono para un estilo más bonito y moderno -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Quicksand:wght@300..700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN para un estilo rápido y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js para el sonido del "pip" -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* Fuente Quicksand para un estilo más bonito y similar a Milk Mocha Bear */
+        body {
+            font-family: 'Quicksand', sans-serif; /* Aplicamos Quicksand como la principal */
+            transition: background-color 0.5s, color 0.5s;
+        }
+
+        /* Estilos para el modo claro (soft - como estaba antes) */
+        .light-mode {
+            background-color: #f0f4f8; /* Azul claro muy suave */
+            color: #334155; /* Gris oscuro suave para texto general */
+        }
+        .light-mode .btn-primary {
+            background-color: #60a5fa; /* Azul claro */
+            color: white;
+        }
+        .light-mode .btn-primary:hover {
+            background-color: #3b82f6; /* Azul más oscuro al pasar el ratón */
+            }
+        .light-mode .input-field {
+            border-color: #94a3b8; /* Gris medio */
+            background-color: #e2e8f0; /* Gris muy claro */
+            color: #334155; /* Asegura que el texto dentro del input sea también oscuro */
+        }
+        .light-mode .heart {
+            color: #ef4444; /* Rojo brillante (corazones siempre rojos) */
+            text-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        }
+        .light-mode .bat {
+            color: #6b7280; /* Gris oscuro (no visible en modo claro) */
+        }
+
+        /* Estilos específicos para las etiquetas en modo claro (gris oscuro, sin sombra) */
+        .light-mode label {
+            color: #334155; /* Gris oscuro suave para las etiquetas */
+            text-shadow: none; /* Eliminar la sombra de texto */
+        }
+        /* El contenedor del formulario vuelve a ser blanco en modo claro */
+        .light-mode .form-box-container {
+            background-color: #ffffff; /* Fondo blanco */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 10px 15px rgba(0, 0, 0, 0.1); /* Sombra original */
+        }
+
+
+        /* Estilos para el modo oscuro (TERROR) */
+        .dark-mode {
+            background-color: #1a0000; /* Rojo muy oscuro, casi negro */
+            color: #e0e0e0; /* Blanco roto */
+        }
+        .dark-mode .btn-primary {
+            background-color: #be123c; /* Rojo oscuro */
+            color: white;
+        }
+        .dark-mode .input-field {
+            border-color: #7f1d1d; /* Rojo oscuro */
+            background-color: #450a0a; /* Rojo muy oscuro */
+            color: #e0e0e0;
+        }
+        .dark-mode .heart {
+            color: #dc2626; /* Rojo terrorífico */
+            text-shadow: 0 0 10px rgba(220, 38, 38, 0.8);
+        }
+        .dark-mode .bat {
+            color: #4c051e; /* Morado oscuro */
+            text-shadow: 0 0 10px rgba(76, 5, 30, 0.8);
+        }
+
+        /* Animación de los elementos (corazones/murciélagos) */
+        @keyframes flyUpAndFade {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-200px) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .animated-element {
+            position: absolute;
+            font-size: 3rem; /* Tamaño grande para que se vean bien */
+            pointer-events: none; /* Para que no interfieran con los clics */
+            animation: flyUpAndFade 2s forwards ease-out;
+            z-index: 10; /* Z-index dentro de su contenedor */
+        }
+
+        /* Estilos para el mensaje de latido */
+        #heartbeatMessage {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 2rem;
+            min-height: 2em; /* Para evitar CLS */
+        }
+
+        /* Estilos para el contenedor principal */
+        .main-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            position: relative; /* Necesario para los elementos animados */
+            overflow: hidden; /* Para que los elementos no salgan del viewport */
+        }
+
+        /* ECG Simulation Styles - Base */
+        #ecgSimulationContainer {
+            display: none; /* Oculto por defecto */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 20; /* Asegurarse de que esté por encima del formulario */
+            transition: background-color 0.5s, color 0.5s; /* Transición para el cambio de modo */
+        }
+        #ecgCanvas {
+            background-color: #000; /* Fondo negro para el ECG */
+            border-radius: 8px;
+            display: block;
+            touch-action: none; /* Previene el scroll en móviles al tocar el canvas */
+            max-width: 90%; /* Ajuste para pantallas pequeñas */
+            max-height: 60vh; /* Ajuste para pantallas pequeñas */
+            transition: border-color 0.5s, box-shadow 0.5s; /* Transición para el cambio de modo */
+        }
+        #ecgSimulationContainer h1 {
+            margin-bottom: 1.5rem; /* Reducido a 1.5rem para menos separación */
+            text-align: center;
+            transition: color 0.5s, text-shadow 0.5s; /* Transición para el cambio de modo */
+            font-size: 3rem; /* Ajuste para que sea más grande */
+            font-weight: bold;
+        }
+        #ecgSimulationContainer #message {
+            margin-top: 1.5rem; /* Reducido a 1.5rem para menos separación */
+            font-size: 1.2rem;
+            text-align: center;
+            transition: color 0.5s, text-shadow 0.5s; /* Transición para el cambio de modo */
+        }
+
+        /* ECG Simulation Styles - Light Mode (soft) */
+        .light-mode #ecgSimulationContainer {
+            background-color: #e0f2f7; /* Un azul muy claro y suave */
+            color: #2c3e50; /* Gris oscuro para el texto */
+        }
+        .light-mode #ecgSimulationContainer h1 {
+            color: #3498db; /* Azul brillante para el título */
+            text-shadow: 0 0 5px rgba(52, 152, 219, 0.6);
+        }
+        .light-mode #ecgSimulationContainer #message {
+            color: #2c3e50;
+        }
+        .light-mode #ecgCanvas {
+            border: 2px solid #3498db; /* Borde azul para el canvas */
+            box-shadow: 0 0 20px rgba(52, 152, 219, 0.8);
+        }
+
+        /* ECG Simulation Styles - Dark Mode (TERROR) */
+        .dark-mode #ecgSimulationContainer {
+            background-color: #1a0000; /* Rojo muy oscuro, casi negro */
+            color: #e0e0e0;
+        }
+        .dark-mode .input-field {
+            border-color: #7f1d1d; /* Rojo oscuro */
+            background-color: #450a0a; /* Rojo muy oscuro */
+            color: #e0e0e0;
+        }
+        .dark-mode .heart {
+            color: #dc2626; /* Rojo terrorífico */
+            text-shadow: 0 0 10px rgba(220, 38, 38, 0.8);
+        }
+        .dark-mode .bat {
+            color: #4c051e; /* Morado oscuro */
+            text-shadow: 0 0 10px rgba(76, 5, 30, 0.8);
+        }
+
+        /* Estilos para el nuevo contenedor de llenado del corazón */
+        #heartFillingContainer {
+            display: none; /* Oculto por defecto */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 15; /* Entre el formulario principal y el ECG */
+            background-color: #f0f4f8; /* Mismo fondo que el modo claro principal */
+            color: #334155; /* Mismo color de texto que el modo claro principal */
+            transition: background-color 0.5s, color 0.5s;
+        }
+
+        #interactiveHeart {
+            width: 300px; /* Tamaño base del corazón SVG - AUMENTADO */
+            height: 300px; /* Tamaño base del corazón SVG - AUMENTADO */
+            cursor: pointer;
+            position: relative; /* Para posicionar el porcentaje */
+        }
+
+        /* Animación de "boom" para el corazón */
+        @keyframes heartBoom {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); } /* Pequeño crecimiento */
+            100% { transform: scale(1); } /* Vuelve a su tamaño original */
+        }
+
+        .heart-boom {
+            animation: heartBoom 0.2s ease-out; /* Animación rápida de 0.2 segundos */
+        }
+
+        #heartPercentage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem; /* Tamaño del porcentaje - AUMENTADO */
+            font-weight: bold;
+            color: white; /* Color blanco para el porcentaje */
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.7); /* Sombra para que resalte */
+            z-index: 2; /* Para que esté por encima del SVG */
+        }
+
+        #heartMessage {
+            font-size: 1.8rem; /* Mensaje grande y legible */
+            font-weight: 600; /* Seminegrita */
+            text-align: center;
+            margin-top: 2rem; /* Ajustado para que tenga la misma distancia que el título (2rem = mb-8) */
+            min-height: 2.5em; /* Para evitar CLS al cambiar mensajes */
+            padding: 0 1rem; /* Pequeño padding para que no se pegue a los bordes */
+        }
+
+        #heartFillingContainer p {
+            font-size: 1.1rem; /* Tamaño para el texto de instrucción */
+            margin-top: 1rem;
+        }
+
+        /* Estilo para el nuevo botón de ver ECG */
+        #viewECGButton {
+            margin-top: 2rem; /* Espacio para separarse del corazón/mensaje */
+            /* Reutiliza los estilos de btn-primary de Tailwind */
+        }
+    </style>
+</head>
+<body class="light-mode">
+    <div class="main-container">
+        <!-- Contenedor del formulario principal -->
+        <div id="mainFormContainer" class="flex flex-col items-center w-full"> 
+            <h1 class="text-4xl md:text-5xl font-extrabold text-center rounded-lg p-4 mb-0">
+                ENTRE LATIDOS SILENCIOSOS
+            </h1>
+            <sub class="text-lg md:text-xl font-medium mt-0 text-center uppercase">UN REGISTRO ELÉCTRICO DE CÓMO NOS HACEMOS SENTIR</sub>
+
+            <!-- Espaciador invisible para separar el subtítulo del formulario -->
+            <div class="h-16"></div> <!-- Reducido a h-16 (4rem) -->
+
+            <!-- El contenedor del formulario ahora tiene la clase 'form-box-container' -->
+            <div class="form-box-container bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-md mb-8 transition-colors duration-500">
+                <div class="mb-4">
+                    <label for="yourName" class="block text-lg font-bold mb-2">
+                        Tu nombre:
+                    </label>
+                    <input type="text" id="yourName" value="Thessían" readonly
+                           class="input-field w-full p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 text-base">
+                </div>
+
+                <div class="mb-6">
+                    <label for="specialPersonName" class="block text-lg font-bold mb-2">
+                        Nombre de tu persona especial:
+                    </label>
+                    <input type="text" id="specialPersonName" placeholder="Ej: nubecita"
+                           class="input-field w-full p-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 text-base">
+                </div>
+
+                <button id="checkHeartbeatBtn"
+                        class="btn-primary w-full py-3 rounded-lg font-bold text-lg shadow-md hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+                    Comprobar el latido de tu corazón
+                </button>
+            </div>
+
+            <p id="heartbeatMessage" class="text-center"></p>
+
+            <p id="pulseInstruction" class="text-center mt-4 text-lg">
+                Toca o haz clic en cualquier parte de la pantalla para sentir el pulso.
+            </p>
+        </div>
+
+        <!-- Nuevo Contenedor para el Llenado del Corazón (inicialmente oculto) -->
+        <div id="heartFillingContainer">
+            <h2 class="text-3xl md:text-4xl font-extrabold mb-8 text-center">¡Llena nuestro corazón de amor!</h2>
+            <div id="interactiveHeart" class="relative">
+                <svg viewBox="0 0 100 100" class="w-full h-full absolute top-0 left-0">
+                    <defs>
+                        <clipPath id="heartFillClip">
+                            <!-- El rectángulo que controla el llenado, empieza en y=100 (abajo) con altura 0 -->
+                            <rect id="fillRect" x="0" y="100" width="100" height="0"></rect>
+                        </clipPath>
+                    </defs>
+                    <!-- Contorno del corazón (vacío) -->
+                    <path d="M 10 30 A 20 20 0 0 1 50 30 A 20 20 0 0 1 90 30 Q 90 60 50 90 Q 10 60 10 30 z" fill="none" stroke="#ef4444" stroke-width="5"></path>
+                    <!-- Parte llena del corazón (se llenará con el clip-path) -->
+                    <path d="M 10 30 A 20 20 0 0 1 50 30 A 20 20 0 0 1 90 30 Q 90 60 50 90 Q 10 60 10 30 z" fill="#ef4444" clip-path="url(#heartFillClip)"></path>
+                </svg>
+                <span id="heartPercentage">0%</span>
+            </div>
+            <p id="heartClickMessage" class="text-center"></p>
+            <p id="fillHeartInstructionMessage" class="text-center mt-4">¡Haz clic en el corazón para llenarlo y mostrar mensajitos para ti!</p>
+            <button id="viewECGButton"
+                    class="btn-primary py-3 px-6 rounded-lg font-bold text-lg shadow-md hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                    style="display: none;">
+                Ver cuando late mi corazón por ella
+            </button>
+        </div>
+
+        <!-- Contenedor de la simulación de ECG (inicialmente oculto) -->
+        <div id="ecgSimulationContainer" class="flex flex-col justify-center items-center gap-8">
+            <h1 class="text-3xl md:text-4xl font-extrabold">Mira como de bobo te tiene</h1>
+            <canvas id="ecgCanvas"></canvas>
+            <p id="message">¡Observa el latido de tu corazón!</p>
+            <button id="backButton"
+                    class="btn-primary py-3 px-6 rounded-lg font-bold text-lg shadow-md hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+                Volver a comprobar nuestros nombres
+            </button>
+        </div>
+
+        <!-- Botón para cambiar el modo (claro/oscuro) -->
+        <button id="modeToggle"
+                class="absolute top-4 right-4 p-3 rounded-full shadow-lg text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300">
+            ☀️ / 🌙
+        </button>
+    </div>
+
+    <script>
+        // --- Variables y Elementos del DOM ---
+        const yourNameInput = document.getElementById('yourName');
+        const specialPersonNameInput = document.getElementById('specialPersonName');
+        const checkHeartbeatBtn = document.getElementById('checkHeartbeatBtn');
+        const heartbeatMessage = document.getElementById('heartbeatMessage');
+        const mainContainer = document.querySelector('.main-container');
+        const mainFormContainer = document.getElementById('mainFormContainer');
+        const ecgSimulationContainer = document.getElementById('ecgSimulationContainer');
+        const modeToggle = document.getElementById('modeToggle');
+        const body = document.body;
+        const backButton = document.getElementById('backButton');
+
+        // Nuevos elementos para la pantalla del corazón
+        const heartFillingContainer = document.getElementById('heartFillingContainer');
+        const interactiveHeart = document.getElementById('interactiveHeart');
+        const heartClickMessage = document.getElementById('heartClickMessage');
+        const heartPercentageSpan = document.getElementById('heartPercentage'); // Nuevo para el porcentaje
+        const fillRect = document.getElementById('fillRect'); // Rectángulo dentro del clipPath SVG
+        const viewECGButton = document.getElementById('viewECGButton'); // Nuevo botón
+        const fillHeartInstructionMessage = document.getElementById('fillHeartInstructionMessage'); // Nuevo elemento DOM para la instrucción de llenar corazón
+
+        // Elemento para la instrucción de pulso
+        const pulseInstruction = document.getElementById('pulseInstruction');
+
+        // ECG Canvas elements
+        const canvas = document.getElementById('ecgCanvas');
+        const ctx = canvas.getContext('2d');
+        // const personNameECGSpan = document.getElementById('personNameECG'); // Ya no es necesario, el título es fijo
+
+        let isDarkMode = false; // Estado inicial del modo (claro)
+        let animationFrameId; // Para controlar el bucle de animación del ECG
+        let xOffset = 0;
+        const speed = 4; // Velocidad del desplazamiento del ECG (Aumentada para más emoción)
+        const scaleY = 80; // Escala vertical de la onda (Aumentada para más emoción)
+        let midY; // Se calculará dinámicamente
+        let pipTriggeredForCycle = false; // Nueva bandera para controlar el sonido del pip
+        let heartSpawnInterval; // Variable para el intervalo de aparición de corazones
+
+        let currentHeartClicks = 0; // Contador de clics en el corazón
+        const heartMessages = [
+            "Cada clic es un beso invisible directo al alma.",
+            "¿Lo sientes? Es mi amor vibrando con cada toque tuyo.",
+            "Late, late… porque tú lo haces posible.",
+            "¡Esa velocidad me deja sin aliento… y con mariposas!",
+            "Ya casi, gordo. Mi corazón está por explotar de emoción.",
+            "¡Vas increíble! Me derrito un poco más por ti.",
+            "Con cada clic, florezco. Como un girasol que te sigue siempre.",
+            "Mira, este corazón crece igual de mi adoración por ti diaria.",
+            "Solo un poquito más… como cuando uno se queda por ‘un capítulo más’.",
+            "Tu sonrisa es sinónimo del código que me programa la felicidad.",
+            "Este corazón ya es tuyo. Ni lo intentes devolver.",
+            "Mira cómo se infla... como un globo de ternura.",
+            "No pares… estoy brillando por dentro, lo juro.",
+            "Cada toque tuyo es mi canción favorita repitiéndose.",
+            "¡Latimos al mismo ritmo! ¿Lo sabías?",
+            "Contigo, hasta los bits suspiran.",
+            "Esto no es una app, es un conjuro de cariño. Tú eres el hechicero.",
+            "Ya falta poquito... como cuando hueles que la pizza ya casi está.",
+            "Último empujoncito. Como ese abrazo largo que no quieres soltar.",
+            "¡Boom! Corazón llenito. Dale click abajo y mira la magia."
+        ];
+        const totalClicks = heartMessages.length; // Ahora es dinámico según los mensajes
+
+        // Escalas para el crecimiento del corazón (20 etapas)
+        // Ya no se usarán para el crecimiento general, solo para el "boom" si se decide reintroducirlo así
+        // Dejamos el array para mantener la compatibilidad si se quiere un efecto de escala sutil
+        const heartScales = Array.from({ length: totalClicks }, (_, i) => 1.0 + (i * (0.05 / (totalClicks - 1)))); // Escala muy pequeña para el "boom"
+
+        // Margen inicial para el mensaje del corazón (fijo, no se alejará)
+        const baseHeartMessageMarginTop = 32; // Ajustado a 2rem para que coincida con el mb-8 del título
+
+        // Inicializar el sintetizador de Tone.js para el sonido del latido
+        const heartbeatSynth = new Tone.MembraneSynth({
+            pitchDecay: 0.05,
+            octaves: 8,
+            envelope: {
+                attack: 0.001,
+                decay: 0.4,
+                sustain: 0.01,
+                release: 1.4,
+                attackCurve: "exponential"
+            },
+            oscillator: {
+                type: "sine"
+            },
+            noise: {
+                type: "brown"
+            },
+            volume: -10 // Ajustar volumen si es necesario
+        }).toDestination();
+
+
+        // --- Funciones de Utility ---
+
+        // Función para normalizar texto (quitar tildes y convertir a minúsculas)
+        function normalizeText(text) {
+            return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+        }
+
+        // Nombres válidos normalizados
+        const validNames = [
+            "nerea",
+            "borssvow",
+            "nerea lee",
+            "nerea borssvow",
+            "nerea lee borssvow",
+            "mi petalo",
+            "mrs rohan",
+            "mrs. rohan",
+            "nubecita",
+            "nei",
+            "lee"
+        ];
+
+        // Función para alternar entre modo claro y oscuro
+        function toggleMode() {
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                body.classList.remove('light-mode');
+                body.classList.add('dark-mode');
+                ecgSimulationContainer.classList.remove('light-mode');
+                ecgSimulationContainer.classList.add('dark-mode');
+                heartFillingContainer.style.backgroundColor = '#1a0000'; // Fondo oscuro para el corazón
+                heartFillingContainer.style.color = '#e0e0e0'; // Texto claro para el corazón
+            } else {
+                body.classList.remove('dark-mode');
+                body.classList.add('light-mode');
+                ecgSimulationContainer.classList.remove('dark-mode');
+                ecgSimulationContainer.classList.add('light-mode');
+                heartFillingContainer.style.backgroundColor = '#f0f4f8'; // Fondo claro para el corazón
+                heartFillingContainer.style.color = '#334155'; // Texto oscuro para el corazón
+            }
+            // Re-dibujar ECG si está visible para aplicar nuevos colores inmediatamente
+            if (ecgSimulationContainer.style.display !== 'none') {
+                drawECG();
+            }
+        }
+
+        // Función para reproducir el sonido del latido del corazón (dos tiempos)
+        function playHeartbeatSound() {
+            // Tone.js necesita que el contexto de audio se inicie con una interacción del usuario.
+            if (Tone.context.state !== 'running') {
+                Tone.start();
+            }
+            // Primer "thump"
+            heartbeatSynth.triggerAttackRelease("C2", "0.1"); // Nota grave, corta duración
+            // Segundo "thump" un poco después
+            Tone.Transport.scheduleOnce(() => {
+                heartbeatSynth.triggerAttackRelease("D2", "0.1"); // Una nota ligeramente diferente para el segundo golpe
+            }, Tone.Transport.now() + 0.15); // Retraso de 0.15 segundos para el segundo golpe
+        }
+
+        // --- Funciones del ECG ---
+
+        // Configurar el tamaño del canvas para que sea responsivo
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * 0.8; // 80% del ancho de la ventana
+            canvas.height = window.innerHeight * 0.5; // 50% de la altura de la ventana
+            midY = (canvas.height / 2) + 40; // Recalcular el centro vertical y bajarlo 40px
+        }
+
+        // Función para dibujar la onda del ECG
+        function drawECG() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpiar el canvas
+
+            // Dibujar la cuadrícula (color según el modo)
+            ctx.strokeStyle = isDarkMode ? 'rgba(0, 255, 0, 0.1)' : 'rgba(52, 152, 219, 0.1)'; /* Verde para oscuro, azul tenue para claro */
+            const gridSize = 20; // Tamaño de cada cuadro de la cuadrícula
+            for (let i = 0; i < canvas.width; i += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            ctx.beginPath();
+            ctx.strokeStyle = isDarkMode ? '#00ff00' : '#3b82f6'; /* Verde brillante para oscuro, azul vibrante para claro */
+            ctx.lineWidth = 2;
+
+            // Resetear la bandera del pip al inicio de un nuevo ciclo de onda
+            if (xOffset > -speed && xOffset <= 0) {
+                pipTriggeredForCycle = false;
+            }
+
+            for (let i = 0; i < canvas.width; i++) {
+                let y;
+                const wavePos = (i + xOffset) % 150;
+
+                if (wavePos < 15) { // P wave
+                    y = midY + Math.sin(wavePos / 15 * Math.PI) * scaleY * 0.15;
+                } else if (wavePos < 30) { // PR segment
+                    y = midY;
+                } else if (wavePos < 40) { // Q wave
+                    y = midY + (wavePos - 30) / 10 * scaleY * 0.6;
+                } else if (wavePos < 50) { // R wave (peak)
+                    y = midY - (50 - wavePos) / 10 * scaleY * 2.0;
+                    // Si estamos en el pico de la R y el sonido no ha sido disparado para este ciclo
+                    if (wavePos === 45 && !pipTriggeredForCycle) {
+                        // Dibujar el "pip" visual (color según el modo)
+                        ctx.fillStyle = isDarkMode ? '#ff0000' : '#ef4444'; /* Rojo brillante para oscuro, rojo normal para claro */
+                        ctx.beginPath();
+                        ctx.arc(i, y, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        playHeartbeatSound(); // Reproducir el sonido del latido
+                        pipTriggeredForCycle = true; // Marcar que el sonido ya fue disparado para este ciclo
+                    }
+                } else if (wavePos < 60) { // S wave
+                    y = midY + (wavePos - 50) / 10 * scaleY * 1.0;
+                } else if (wavePos < 90) { // ST segment
+                    y = midY;
+                } else if (wavePos < 110) { // T wave
+                    y = midY + Math.sin((wavePos - 90) / 20 * Math.PI) * scaleY * 0.4;
+                } else { // Isoelectric line
+                    y = midY;
+                }
+
+                if (i === 0) {
+                    ctx.moveTo(i, y);
+                } else {
+                    ctx.lineTo(i, y);
+                }
+            }
+            ctx.stroke();
+
+            xOffset = (xOffset - speed) % 150; // Mover la onda
+        }
+
+        // Bucle de animación del ECG
+        function animateECG() {
+            drawECG();
+            animationFrameId = requestAnimationFrame(animateECG);
+        }
+
+        // Detener la animación del ECG
+        function stopECGAnimation() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+
+        // --- Funciones para Corazones Flotantes ---
+        function startHeartSpawning() {
+            // Limpiar cualquier intervalo existente para evitar duplicados
+            if (heartSpawnInterval) {
+                clearInterval(heartSpawnInterval);
+            }
+
+            heartSpawnInterval = setInterval(() => {
+                // Posición X e Y aleatoria dentro del contenedor ECG
+                const x = Math.random() * ecgSimulationContainer.offsetWidth;
+                const y = Math.random() * ecgSimulationContainer.offsetHeight;
+                // Siempre spawnear un corazón en la pantalla ECG
+                createAnimatedElement('❤️', x, y, ecgSimulationContainer);
+            }, 500); // Aparece un corazón cada 0.5 segundos
+        }
+
+        function stopHeartSpawning() {
+            if (heartSpawnInterval) {
+                clearInterval(heartSpawnInterval);
+                heartSpawnInterval = null;
+            }
+        }
+
+        // --- Event Listeners ---
+
+        // Event listener para el botón de alternar modo
+        modeToggle.addEventListener('click', toggleMode);
+
+        // Event listener para el botón de comprobar latido
+        checkHeartbeatBtn.addEventListener('click', () => {
+            const yourName = yourNameInput.value;
+            const specialPersonNameRaw = specialPersonNameInput.value.trim();
+            const specialPersonNameNormalized = normalizeText(specialPersonNameRaw);
+
+            // Mostrar el nombre de la persona que introdujo su nombre
+            heartbeatMessage.textContent = `¡Hola, ${yourName}! `;
+
+            // Lógica para el nombre de la persona especial
+            if (validNames.includes(specialPersonNameNormalized)) {
+                // Ocultar el formulario principal y mostrar la pantalla del corazón
+                mainFormContainer.style.display = 'none';
+                heartFillingContainer.style.display = 'flex';
+                
+                // Resetear el estado del corazón para una nueva interacción
+                currentHeartClicks = 0;
+                interactiveHeart.style.transform = `scale(1)`; // Asegurarse de que el corazón esté en su tamaño normal al inicio
+                fillRect.setAttribute('height', '0'); // Reiniciar llenado SVG
+                fillRect.setAttribute('y', '100'); // Reiniciar posición de llenado SVG
+                heartPercentageSpan.textContent = '0%'; // Reiniciar porcentaje
+                heartClickMessage.textContent = heartMessages[0]; // Mostrar el primer mensaje
+                fillHeartInstructionMessage.style.display = 'block'; // Asegurarse de que la instrucción esté visible al inicio del llenado
+                
+                heartClickMessage.style.marginTop = `2rem`; // Aplicar el margen base fijo (2rem)
+                viewECGButton.style.display = 'none'; // Asegurarse de que el botón esté oculto al inicio
+
+                // Asegurar que los colores del contenedor del corazón coincidan con el modo actual
+                if (isDarkMode) {
+                    heartFillingContainer.style.backgroundColor = '#1a0000';
+                    heartFillingContainer.style.color = '#e0e0e0';
+                } else {
+                    heartFillingContainer.style.backgroundColor = '#f0f4f8';
+                    heartFillingContainer.style.color = '#334155';
+                }
+
+            } else if (specialPersonNameRaw !== '') {
+                // Mensaje de celos gracioso
+                heartbeatMessage.textContent = `¡Un momento, mi amor! Ese nombre... ¡No es el mío! Tu corazón solo late por mi. ¿Intentamos de nuevo con el nombre correcto, por favor?`;
+            } else {
+                heartbeatMessage.textContent = `Ingresa el nombre de tu persona especial para ver el latido.`;
+            }
+        });
+
+        // Event listener para el clic en el corazón interactivo
+        interactiveHeart.addEventListener('click', () => {
+            if (currentHeartClicks < totalClicks) {
+                currentHeartClicks++;
+                heartClickMessage.textContent = heartMessages[currentHeartClicks - 1];
+                
+                // Aplicar la animación de "boom"
+                interactiveHeart.classList.remove('heart-boom'); // Resetear la animación si ya estaba
+                void interactiveHeart.offsetWidth; // Truco para forzar el reflow y reiniciar la animación
+                interactiveHeart.classList.add('heart-boom');
+
+                // Actualizar el llenado del corazón SVG
+                const fillPercentage = (currentHeartClicks / totalClicks) * 100;
+                fillRect.setAttribute('height', fillPercentage);
+                fillRect.setAttribute('y', 100 - fillPercentage); // SVG y-axis is from top
+
+                // Actualizar el porcentaje de llenado
+                heartPercentageSpan.textContent = `${Math.round(fillPercentage)}%`;
+
+                // Ocultar la instrucción de "Haz clic..." cuando el corazón está lleno
+                if (currentHeartClicks === totalClicks) {
+                    fillHeartInstructionMessage.style.display = 'none';
+                }
+            }
+
+            // Si se han mostrado todos los mensajes (corazón lleno), mostrar el botón
+            if (currentHeartClicks === totalClicks) {
+                viewECGButton.style.display = 'block'; // Mostrar el botón
+            }
+        });
+
+        // Event listener para el nuevo botón "Ver cuando late mi corazón por ella"
+        viewECGButton.addEventListener('click', () => {
+            heartFillingContainer.style.display = 'none';
+            ecgSimulationContainer.style.display = 'flex';
+            // personNameECGSpan.textContent = specialPersonNameInput.value.trim(); // Ya no es necesario, el título es fijo
+            resizeCanvas();
+            animateECG();
+            startHeartSpawning(); // Iniciar la aparición de corazones flotantes al entrar en esta pantalla
+        });
+
+
+        // Event listener para el botón "Volver"
+        backButton.addEventListener('click', () => {
+            // Detener la animación del ECG y la aparición de elementos
+            stopECGAnimation();
+            stopHeartSpawning(); // Detener la aparición de corazones flotantes al salir de esta pantalla
+            // Ocultar la simulación de ECG y mostrar el formulario principal
+            ecgSimulationContainer.style.display = 'none';
+            mainFormContainer.style.display = 'flex';
+            heartbeatMessage.textContent = 'Ingresa el nombre de tu persona especial para ver el latido.'; // Restablecer el mensaje inicial
+            specialPersonNameInput.value = ''; // Limpiar el campo de nombre especial
+
+            // Resetear el estado del corazón de llenado al volver
+            currentHeartClicks = 0;
+            interactiveHeart.style.transform = `scale(1)`; // Asegurarse de que el corazón esté en su tamaño normal
+            fillRect.setAttribute('height', '0');
+            fillRect.setAttribute('y', '100');
+            heartPercentageSpan.textContent = '0%';
+            heartClickMessage.textContent = heartMessages[0];
+            fillHeartInstructionMessage.style.display = 'block'; // Asegurarse de que la instrucción esté visible al volver
+            heartClickMessage.style.marginTop = `2rem`; // Resetear margen al valor base (2rem)
+            viewECGButton.style.display = 'none'; // Ocultar el botón al volver
+        });
+
+        // Función para crear y animar elementos (corazones o murciélagos)
+        // Añadimos un parámetro 'parentElement' con un valor por defecto
+        function createAnimatedElement(content, x, y, parentElement = mainContainer) {
+            const element = document.createElement('div');
+            element.textContent = content;
+            element.classList.add('animated-element');
+
+            // Asignar clase de estilo según el contenido (corazón o murciélago)
+            if (content === '❤️') {
+                element.classList.add('heart');
+            } else if (content === '🦇') {
+                element.classList.add('bat');
+            }
+
+            // Posicionar el elemento
+            element.style.left = `${x}px`;
+            element.style.top = `${y}px`;
+
+            // Añadir al elemento padre especificado
+            parentElement.appendChild(element);
+
+            // Eliminar el elemento después de que termine la animación
+            element.addEventListener('animationend', () => {
+                element.remove();
+            });
+        }
+
+        // Event listener para clics/taps en cualquier parte del documento (solo cuando el formulario principal está visible)
+        mainContainer.addEventListener('click', (event) => {
+            // Solo disparar elementos animados si el formulario principal está visible
+            if (mainFormContainer.style.display !== 'none') {
+                // Get click coordinates relative to the mainContainer
+                const rect = mainContainer.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                // Decidir si mostrar corazón o murciélago según el modo
+                const elementContent = isDarkMode ? (Math.random() < 0.5 ? '❤️' : '🦇') : '❤️';
+                // Pass mainContainer as the parent
+                createAnimatedElement(elementContent, x, y, mainContainer);
+            }
+        });
+
+        // Event listener for clicks/taps on the ECG simulation screen
+        ecgSimulationContainer.addEventListener('click', (event) => {
+            // Only trigger animated elements if the ECG simulation screen is visible
+            if (ecgSimulationContainer.style.display !== 'none') {
+                // Get click coordinates relative to the ecgSimulationContainer
+                const rect = ecgSimulationContainer.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                // Siempre spawnear un corazón en la pantalla ECG, independientemente del modo
+                createAnimatedElement('❤️', x, y, ecgSimulationContainer);
+            }
+        });
+
+
+        // Asegurarse de que el nombre de Thessían siempre esté visible y el canvas se redimensione al cargar
+        window.onload = () => {
+            yourNameInput.value = "Thessían"; // Vuelve a establecer el valor por defecto
+            // Establecer el mensaje inicial al cargar la página
+            heartbeatMessage.textContent = 'Ingresa el nombre de tu persona especial para ver el latido.';
+            resizeCanvas(); // Asegurar el tamaño inicial del canvas
+        };
+
+        // Ajustar el tamaño del canvas si la ventana cambia de tamaño (solo si la simulación está visible)
+        window.addEventListener('resize', () => {
+            if (ecgSimulationContainer.style.display !== 'none') {
+                resizeCanvas();
+            }
+        });
+    </script>
+</body>
+</html>
